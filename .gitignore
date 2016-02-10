@@ -1,0 +1,8 @@
+# Ignore these files & directories
+.DS_Store
+node_modules
+
+Ignore the stuff in the public directory except for ...
+lib/config
+
+# Unless they match this file path

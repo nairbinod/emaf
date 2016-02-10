@@ -1,0 +1,24 @@
+{
+  "name": "emaf",
+  "main": "sanitizer.js",
+  "version": "0.0.1",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/skilbjo/emaf.git"
+  },
+  "engines": {
+    "node": "5.6.1"
+  },
+  "dependencies": {
+    "underscore": "1.8.3",
+    "csv": "0.4.5",
+    "fast-csv": "0.6.0"
+  },
+  "devDependencies": {
+    "nodemon": "1.2.1" 
+  },
+  "jshintConfig": {
+    "laxcomma": true
+  }
+}
