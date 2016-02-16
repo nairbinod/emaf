@@ -12,8 +12,7 @@
   },
   "dependencies": {
     "underscore": "1.8.3",
-    "csv": "0.4.5",
-    "fast-csv": "0.6.0"
+     "pg": "4.4.3"
   },
   "devDependencies": {
     "nodemon": "1.2.1" 

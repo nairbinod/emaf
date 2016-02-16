@@ -95,7 +95,8 @@ var credit_reconciliation_transaction_1 = function(line, cb){
 		card_type = h.parse(line,115,3), //table 100.31
 		txn_amount = parseFloat(h.parse(line,74,11) * 0.01).toFixed(2),
 		mcc = h.parse(line,107,4),
-		draft_locator = h.parse(line,124,11)
+		draft_locator = h.parse(line,124,11),
+		txn_amount_sign = function(transaction_type) { return transaction_type === 'Gross' ? '+' : '-' }
 	;
 	new_record();
 
@@ -104,7 +105,7 @@ var credit_reconciliation_transaction_1 = function(line, cb){
 	result.transaction_type = transaction_type;
 	result.card = card_number;
 	result.network = h.network(network);
-	result.amount = txn_amount;
+	result.amount = txn_amount_sign(transaction_type) + txn_amount;
 	result.mcc = mcc;
 	result.card_type = card_type;
 

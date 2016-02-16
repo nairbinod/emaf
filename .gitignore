@@ -2,6 +2,8 @@
 .DS_Store
 node_modules
 data/
+lib/config/
+spec/
 
 Ignore the stuff in the public directory except for ...
 lib/config
