@@ -20,17 +20,17 @@ def show_record_types_in_file(inputFile):
 
 def mask_071_record(record):
     start = record[:73]
-    return start + ('*' * (len(record) - len(start))) + '\n'
+    return start + ('X' * (len(record) - len(start))) + '\n'
 
 def mask_072_record(record):
-    return record[:15] + ('*' * 26) + record[41:]
+    return record[:15] + ('X' * 26) + record[41:]
 
 def mask_300_record(record):
-    return record[:56] + ('*' * 6) + record[62:] #Currently only shows last 3 for Amex.
+    return record[:56] + ('X' * 6) + record[62:] #Currently only shows last 3 for Amex.
 
 def mask_501_record(record):
     start = record[:15]
-    return start + ('*' * (len(record) - len(start))) + '\n'
+    return start + ('X' * (len(record) - len(start))) + '\n'
 
 def mask_emf(inputFile):
     KNOWN_RECORDS = {'010', '070', '071', '072', '080', '300', '301', '500', '501', '503', '910', '970', '980'}

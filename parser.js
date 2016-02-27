@@ -2,7 +2,7 @@ var fs = require('fs'), path = require('path'),	h = require('./lib/helper.js'), 
 	fileName = 'emaf.masked.txt', file = path.join('./data', fileName),
 	stream = fs.createReadStream(file), rl = require('readline').createInterface({ input: stream }),
 	result = {	id: null	}, merchant = { merchant_id: null },
-	data = [], final_data = [], imprt = true;
+	data = [], final_data = [], imprt = false;
 
 var sql = 'insert into interchange('+
     ' Date, Merchant_Id, Merchant_Name, Network, Transaction_Type, '+ 
@@ -134,8 +134,9 @@ var credit_reconciliation_transaction_1 = function(line, cb){
 		txn_amount = parseFloat(h.parse(line,74,11) * 0.01).toFixed(2),
 		mcc = h.parse(line,107,4),
 		draft_locator = h.draft_locator(h.parse(line,124,11)),
-		txn_amount_sign = function(transaction_type) { return transaction_type === 'Gross' ? '+' : '-' }
+		txn_amount_sign = function(transaction_type) { return transaction_type === 'Gross' ? '+' : '-' };
 	;
+
 	new_record();
 
 console.log(
