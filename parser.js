@@ -1,27 +1,27 @@
-var fs = require('fs'), path = require('path'),	h = require('./lib/helper.js'), psql = require('./lib/config/database.js'),
+var fs = require('fs'), path = require('path'),	h = require('./lib/helper.js'), i = require('./lib/interchange_code.js'), psql = require('./lib/config/database.js'),
 	fileName = 'emaf.masked.txt', file = path.join('./data', fileName),
-	stream = fs.createReadStream(file), rl = require('readline').createInterface({ input: stream }),
 	result = {	id: null	}, merchant = { merchant_id: null },
-	data = [], final_data = [], imprt = false;
+	data = [], final_data = [], imprt = false
+	;
 
 var sql = 'insert into interchange('+
     ' Date, Merchant_Id, Merchant_Name, Network, Transaction_Type, '+ 
     ' TransferLogIdClassId, MCC, Card_Number, ' +
     ' Txn_Amount, Interchange, Surcharge) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)';
 
-rl.on('line', function(line){
-	line_type(line);
-});
 
-rl.on('close',function(){
-	if ( imprt ) {
-		psql.connect();
-		transform(data,function(data){
-			db(data);
-			// console.log(data);
-		});
-	}
-});
+var extract = function(cb){
+	var stream = fs.createReadStream(file), rl = require('readline').createInterface({ input: stream })	
+		;
+
+	rl.on('line', function(line){
+		line_type(line);
+	});
+
+	rl.on('close',function(){
+		cb(data);
+	});
+};
 
 var transform = function(arr, cb){
 	var data = [];
@@ -30,7 +30,7 @@ var transform = function(arr, cb){
 		
 		row.push(item['date'], item['merchant_id'], item['merchant_name'],item['network'],item['transaction_type'],
 			item['transferLogIdClassId'], item['mcc'], item['card_number'],
-			item['txn_amount'], item['interchange'], item['surcharge']);
+			item['txn_amount'], item['interchange'], item['interchange_code'], item['interchange_qualification'], item['surcharge']);
 
 		data.push(row);		
 	});
@@ -38,20 +38,22 @@ var transform = function(arr, cb){
 	cb(data);
 };
 
-/* Insert into SQL */
-var db = function(data){
-		data.map(function(item,index){
-			console.log(item);
-			psql.query(sql, item, function(err,result){
-				if(err) console.log(err);
-			});
+var load = function(data){
+	data.map(function(item,index){
+		psql.query(sql, item, function(err,result){
+			if(err) console.log(err);
 		});
-	console.log('Data inserted');
+	});
 };
 
-var valid = function(line){
-	return line_type(line);
-};
+extract(function(arr,cb){
+	transform(arr,function(data){
+		if(imprt) psql.connect(); load(data);
+		console.log(data);
+		console.log('done');
+	});
+});
+
 
 var line_type = function(line, cb){
 	/* 
@@ -95,7 +97,6 @@ var line_type = function(line, cb){
 		default:
 			break;
 	}
-
 };
 
 var new_record = function(){
@@ -139,9 +140,9 @@ var credit_reconciliation_transaction_1 = function(line, cb){
 
 	new_record();
 
-console.log(
-	record_sequence_number, record_type_identifier , draft_locator
-	);
+// console.log(
+// 	record_sequence_number, record_type_identifier , transaction_type, draft_locator
+// 	);
 
 	result.id = record_sequence_number;
 	result.date = h.date(transaction_date);
@@ -164,13 +165,19 @@ var credit_reconciliation_transaction_2 = function(line, cb){
 		interchange_amt = parseFloat(h.parse(line,61,14)* 0.000000001).toFixed(2),
 		interchange_sign = h.parse(line,75,1),
 		surcharge_amt = parseFloat(h.parse(line,79,8)* 0.01).toFixed(2),
-		interchange_code = h.parse(line,52,9) // table 100.29
+		// interchange_qualification = i.interchange_qualification(h.parse(line,52,9)) // table 100.29
+		interchange_code = parseInt(h.parse(line,52,9)),
+		interchange_qualification = i.interchange_qualification(parseInt(h.parse(line,52,9))) // table 100.29
 	;
 
 	result.id = record_sequence_number;
 	result.interchange = interchange_sign + interchange_amt;
+	result.interchange_code = interchange_code;
+	result.interchange_qualification = interchange_qualification;
 	result.surcharge = interchange_sign + surcharge_amt;
 	// result.interchange_code = interchange_code;
+
+	// console.log(record_sequence_number,interchange_code,interchange_qualification)
 
 	data.push(result);
 };
