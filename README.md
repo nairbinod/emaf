@@ -21,8 +21,11 @@ $ cd automation ; ./parse.sh
 - [X] Parse file
 - [X] ETL production data into datamart
 - [X] create join of production data to parsed EMAF data
-- [ ] turn fixed-length of TransferLog Id (string) into an integer without data loss, and concationate again to TransferLog ClassId for string
--	[ ] interchange qualification code
-- [ ] model assessments
-- [ ] model cross border surcharges
+- [X] turn fixed-length of TransferLog Id (string) into an integer without data loss, and concationate again to TransferLog ClassId for string
+-	[X] interchange qualification code
+- [X] issuer type dimension
+- [X] model assessments
+- [X] model cross border surcharges
+- [X] model total surcharges
 - [X] schedule nightly ETL
+- [ ] parse all 2016 files and upload

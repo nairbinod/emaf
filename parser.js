@@ -1,16 +1,18 @@
 var fs = require('fs'), path = require('path'),	h = require('./lib/helper.js'), i = require('./lib/interchange_code.js'), psql = require('./lib/config/database.js'),
-	fileName = 'emaf.masked.txt', file = path.join('./data', fileName),
+	fileDir = './data/masked_test',
 	result = {	id: null	}, merchant = { merchant_id: null },
 	data = [], final_data = [], imprt = false
 	;
 
 var sql = 'insert into interchange('+
-    ' Date, Merchant_Id, Merchant_Name, Network, Transaction_Type, '+ 
-    ' TransferLogIdClassId, MCC, Card_Number, ' +
+    ' Date, Merchant_Id, Merchant_Name, Network, Transaction_Type, Issuer_Type,'+ 
+    ' Draft_Locator, MCC, Card_Number, ' +
     ' Txn_Amount, Interchange, Surcharge) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)';
 
-
-var extract = function(cb){
+/* 
+	Extract Function Expression definition at the top due to  hoisting
+*/ 
+var extract = function(file,cb){
 	var stream = fs.createReadStream(file), rl = require('readline').createInterface({ input: stream })	
 		;
 
@@ -23,14 +25,36 @@ var extract = function(cb){
 	});
 };
 
+
+
+/* 
+	Script begins here
+*/ 
+fs.readdir(fileDir, function(err,files){
+	return files.map(function(file,iterator){
+		return extract(path.join(fileDir,file),function(arr,cb){
+			transform(arr,function(data){
+				if(imprt) { psql.connect(); load(data); }
+				console.log(data);
+				console.log('done');
+			});
+		});
+	});
+});
+
+
+
+/*
+	Function Expression definitions
+*/
 var transform = function(arr, cb){
 	var data = [];
 	arr.map(function(item,iterator){
 		var row = [];
 		
-		row.push(item['date'], item['merchant_id'], item['merchant_name'],item['network'],item['transaction_type'],
-			item['transferLogIdClassId'], item['mcc'], item['card_number'],
-			item['txn_amount'], item['interchange'], item['interchange_code'], item['interchange_qualification'], item['surcharge']);
+		row.push(item['date'], item['merchant_id'], item['merchant_name'],item['network'],item['transaction_type'],item['issuer_type'],
+			item['draft_locator'], item['mcc'], item['card_number'], item['interchange_code'], item['interchange_qualification'],
+			item['txn_amount'], item['interchange'], item['assessments'], item['surcharge'] , item['total_fees']);
 
 		data.push(row);		
 	});
@@ -45,15 +69,6 @@ var load = function(data){
 		});
 	});
 };
-
-extract(function(arr,cb){
-	transform(arr,function(data){
-		if(imprt) psql.connect(); load(data);
-		console.log(data);
-		console.log('done');
-	});
-});
-
 
 var line_type = function(line, cb){
 	/* 
@@ -134,8 +149,9 @@ var credit_reconciliation_transaction_1 = function(line, cb){
 		card_type = h.parse(line,115,3), //table 100.31
 		txn_amount = parseFloat(h.parse(line,74,11) * 0.01).toFixed(2),
 		mcc = h.parse(line,107,4),
-		draft_locator = h.draft_locator(h.parse(line,124,11)),
 		txn_amount_sign = function(transaction_type) { return transaction_type === 'Gross' ? '+' : '-' };
+		draft_locator = h.draft_locator(h.parse(line,124,11))
+
 	;
 
 	new_record();
@@ -152,30 +168,36 @@ var credit_reconciliation_transaction_1 = function(line, cb){
 	result.transaction_type = transaction_type;
 	result.mcc = mcc;
 	result.card_type = card_type;
-	result.transferLogIdClassId = draft_locator;
+	result.draft_locator = draft_locator;
 	result.card_number = card_number;
 	result.txn_amount = txn_amount_sign(transaction_type) + txn_amount;
 
 	// cb();
 };
 
+// var assessments = function(transaction_type, network, card_type, txn_amount){
 
 var credit_reconciliation_transaction_2 = function(line, cb){
 	var record_sequence_number = h.parse(line,1,9),
 		interchange_amt = parseFloat(h.parse(line,61,14)* 0.000000001).toFixed(2),
 		interchange_sign = h.parse(line,75,1),
-		surcharge_amt = parseFloat(h.parse(line,79,8)* 0.01).toFixed(2),
-		// interchange_qualification = i.interchange_qualification(h.parse(line,52,9)) // table 100.29
+		emaf_surcharge_amt = parseFloat(h.parse(line,79,8)* 0.01).toFixed(2),
 		interchange_code = parseInt(h.parse(line,52,9)),
-		interchange_qualification = i.interchange_qualification(parseInt(h.parse(line,52,9))) // table 100.29
+		interchange_qualification = i.interchange_qualification(parseInt(h.parse(line,52,9))), // table 100.29
+		issuer_type = h.issuer_type(interchange_qualification),
+		assessments = h.assessments(result.transaction_type, result.network , result.card_type , result.txn_amount),
+		surcharge = h.surcharge(result.transaction_type, issuer_type, result.network, result.card_type)
 	;
 
 	result.id = record_sequence_number;
 	result.interchange = interchange_sign + interchange_amt;
 	result.interchange_code = interchange_code;
+	result.issuer_type = issuer_type;
 	result.interchange_qualification = interchange_qualification;
-	result.surcharge = interchange_sign + surcharge_amt;
-	// result.interchange_code = interchange_code;
+	result.assessments = interchange_sign + assessments;
+	result.surcharge = interchange_sign + surcharge;
+	result.total_fees =  (parseFloat(result.interchange) - assessments + surcharge);
+
 
 	// console.log(record_sequence_number,interchange_code,interchange_qualification)
 
