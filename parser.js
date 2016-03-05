@@ -35,7 +35,7 @@ fs.readdir(fileDir, function(err,files){
 		return extract(path.join(fileDir,file),function(arr,cb){
 			transform(arr,function(data){
 				if(imprt) { psql.connect(); load(data); }
-				console.log(data);
+				// console.log(data);
 				console.log('done');
 			});
 		});
@@ -52,7 +52,7 @@ var transform = function(arr, cb){
 	arr.map(function(item,iterator){
 		var row = [];
 		
-		row.push(item['date'], item['merchant_id'], item['merchant_name'],item['network'],item['transaction_type'],item['issuer_type'],
+		row.push(item['date'], item['merchant_id'], item['merchant_name'],item['network'],item['transaction_type'],item['issuer_type'],item['card_type'],
 			item['draft_locator'], item['mcc'], item['card_number'], item['interchange_code'], item['interchange_qualification'],
 			item['txn_amount'], item['interchange'], item['assessments'], item['surcharge'] , item['total_fees']);
 
@@ -146,7 +146,7 @@ var credit_reconciliation_transaction_1 = function(line, cb){
 		transaction_type = h.transaction_type(transaction_type_code),
 		card_number = h.parse(line,51,19),
 		network = h.parse(line,111,4), // table 100.14
-		card_type = h.parse(line,115,3), //table 100.31
+		// card_type = h.parse(line,115,3), //table 100.31
 		txn_amount = parseFloat(h.parse(line,74,11) * 0.01).toFixed(2),
 		mcc = h.parse(line,107,4),
 		txn_amount_sign = function(transaction_type) { return transaction_type === 'Gross' ? '+' : '-' };
@@ -160,14 +160,16 @@ var credit_reconciliation_transaction_1 = function(line, cb){
 // 	record_sequence_number, record_type_identifier , transaction_type, draft_locator
 // 	);
 
+	// console.log(result.network, h.network(network));
+
 	result.id = record_sequence_number;
 	result.date = h.date(transaction_date);
 	result.merchant_id = merchant.merchant_id;
 	result.merchant_name = merchant.merchant_name;
 	result.network = h.network(network);
+	result.network_code = network;
 	result.transaction_type = transaction_type;
 	result.mcc = mcc;
-	result.card_type = card_type;
 	result.draft_locator = draft_locator;
 	result.card_number = card_number;
 	result.txn_amount = txn_amount_sign(transaction_type) + txn_amount;
@@ -175,28 +177,32 @@ var credit_reconciliation_transaction_1 = function(line, cb){
 	// cb();
 };
 
-// var assessments = function(transaction_type, network, card_type, txn_amount){
-
 var credit_reconciliation_transaction_2 = function(line, cb){
 	var record_sequence_number = h.parse(line,1,9),
 		interchange_amt = parseFloat(h.parse(line,61,14)* 0.000000001).toFixed(2),
 		interchange_sign = h.parse(line,75,1),
 		emaf_surcharge_amt = parseFloat(h.parse(line,79,8)* 0.01).toFixed(2),
-		interchange_code = parseInt(h.parse(line,52,9)),
-		interchange_qualification = i.interchange_qualification(parseInt(h.parse(line,52,9))), // table 100.29
+		interchange_code = h.parse(line,52,9),
+		interchange_qualification = i.interchange_qualification(result.network, parseInt(h.parse(line,52,9))), // table 100.29
+		card_type = h.card_type(interchange_qualification);
 		issuer_type = h.issuer_type(interchange_qualification),
-		assessments = h.assessments(result.transaction_type, result.network , result.card_type , result.txn_amount),
-		surcharge = h.surcharge(result.transaction_type, issuer_type, result.network, result.card_type)
+		assessments = h.assessments(result.transaction_type, result.network , card_type , result.txn_amount),
+		surcharge = h.surcharge(result.transaction_type, issuer_type, result.network, result.txn_amount)
 	;
 
+	// console.log(result.network, result.interchange_qualification);
+
 	result.id = record_sequence_number;
+	result.card_type = card_type;
 	result.interchange = interchange_sign + interchange_amt;
 	result.interchange_code = interchange_code;
 	result.issuer_type = issuer_type;
 	result.interchange_qualification = interchange_qualification;
 	result.assessments = interchange_sign + assessments;
 	result.surcharge = interchange_sign + surcharge;
-	result.total_fees =  (parseFloat(result.interchange) - assessments + surcharge);
+	result.total_fees = ( parseFloat(result.interchange) - (assessments) - (surcharge) );
+
+	console.log(result);
 
 
 	// console.log(record_sequence_number,interchange_code,interchange_qualification)
